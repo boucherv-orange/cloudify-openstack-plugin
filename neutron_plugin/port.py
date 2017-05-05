@@ -86,7 +86,6 @@ def create(neutron_client, args, **kwargs):
     port = {
         'name': get_resource_id(ctx, PORT_OPENSTACK_TYPE),
         'network_id': net_id,
-        'security_groups': [],
     }
 
     _handle_fixed_ips(port)
