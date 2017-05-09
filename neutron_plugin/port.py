@@ -23,6 +23,7 @@ from openstack_plugin_common import (
     transform_resource_name,
     with_neutron_client,
     get_resource_id,
+    get_resource_by_name_or_id,
     get_openstack_id_of_single_connected_node_by_openstack_type,
     delete_resource_and_runtime_properties,
     delete_runtime_properties,
@@ -54,7 +55,17 @@ NO_SG_PORT_CONNECTION_RETRY_INTERVAL = 3
 @with_neutron_client
 def create(neutron_client, args, **kwargs):
 
-    ext_port = use_external_resource(ctx, neutron_client, PORT_OPENSTACK_TYPE)
+    if 'port_ip' in args.keys():
+        port_id = \
+            _get_exiting_port_with_ip(neutron_client, args.get('port_ip'))
+        ext_port = \
+            get_resource_by_name_or_id(port_id, PORT_OPENSTACK_TYPE,
+                                       neutron_client)
+        ctx.instance.runtime_properties[OPENSTACK_ID_PROPERTY] = port_id
+        ctx.instance.runtime_properties[OPENSTACK_TYPE_PROPERTY] = PORT_OPENSTACK_TYPE
+    else:
+        ext_port = use_external_resource(ctx, neutron_client,
+                                         PORT_OPENSTACK_TYPE)
     if ext_port:
         try:
             net_id = \
@@ -189,6 +200,18 @@ def connect_security_group(neutron_client, **kwargs):
 @with_neutron_client
 def creation_validation(neutron_client, **kwargs):
     validate_resource(ctx, neutron_client, PORT_OPENSTACK_TYPE)
+
+
+def _get_exiting_port_with_ip(neutron_client, ip):
+    ports = neutron_client.list_ports()
+    ports = ports.get('ports')
+    if not ports:
+        return None
+    for port in ports:
+        for fixed_ip in port['fixed_ips']:
+            if ip == fixed_ip['ip_address']:
+                return port.get('id')
+    return None
 
 
 def _get_server_floating_ip(neutron_client, server_id):
